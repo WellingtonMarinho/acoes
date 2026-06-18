@@ -1,0 +1,122 @@
+{
+  "info": {
+    "name": "Ideacoes B3 Alerts API",
+    "_postman_id": "2b4c1d18-7ef0-4c11-9f5f-1f4c0e1f2b1a",
+    "description": "Collection exportável para testar o backend de alertas da B3.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Healthcheck",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/healthz"
+      },
+      "response": []
+    },
+    {
+      "name": "List Alerts",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/alerts"
+      },
+      "response": []
+    },
+    {
+      "name": "Create Alert",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"user-001\",\n  \"symbol\": \"PETR4\",\n  \"target_price\": 40.50,\n  \"direction\": \"above\",\n  \"device_token\": \"device-token-example\"\n}"
+        },
+        "url": "{{baseUrl}}/alerts",
+        "description": "Cria um alerta de preço para um ativo da B3."
+      },
+      "response": []
+    },
+    {
+      "name": "List Devices",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/devices"
+      },
+      "response": []
+    },
+    {
+      "name": "Register Device",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"user-001\",\n  \"device_token\": \"device-token-example\",\n  \"platform\": \"android\"\n}"
+        },
+        "url": "{{baseUrl}}/devices/register",
+        "description": "Registra o token de push de um usuário para uso nos alertas."
+      },
+      "response": []
+    },
+    {
+      "name": "List Prices",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/prices"
+      },
+      "response": []
+    },
+    {
+      "name": "Upsert Price",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"symbol\": \"PETR4\",\n  \"price\": 41.10\n}"
+        },
+        "url": "{{baseUrl}}/prices",
+        "description": "Atualiza o preço corrente de um ativo no feed local."
+      },
+      "response": []
+    },
+    {
+      "name": "Check Prices",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prices\": [\n    {\n      \"symbol\": \"PETR4\",\n      \"price\": 41.10\n    },\n    {\n      \"symbol\": \"VALE3\",\n      \"price\": 58.90\n    }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/prices/check",
+        "description": "Simula um lote de preços e dispara os alertas que cruzarem o alvo."
+      },
+      "response": []
+    }
+  ]
+}
