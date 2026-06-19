@@ -65,3 +65,22 @@ func (r *MemoryRepository) List(ctx context.Context) ([]Registration, error) {
 	})
 	return out, nil
 }
+
+func (r *MemoryRepository) ListByUser(ctx context.Context, userID string) ([]Registration, error) {
+	_ = ctx
+	userID = strings.TrimSpace(userID)
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var out []Registration
+	for _, item := range r.items {
+		if item.UserID == userID {
+			out = append(out, item)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out, nil
+}

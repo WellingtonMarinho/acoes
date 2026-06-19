@@ -56,6 +56,24 @@ func (r *FileAlertRepository) List(ctx context.Context) ([]alerts.Alert, error) 
 	return sortedAlerts(r.alerts), nil
 }
 
+func (r *FileAlertRepository) ListByUser(ctx context.Context, userID string) ([]alerts.Alert, error) {
+	_ = ctx
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	userID = strings.TrimSpace(userID)
+	var out []alerts.Alert
+	for _, alert := range r.alerts {
+		if alert.UserID == userID {
+			out = append(out, alert)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out, nil
+}
+
 func (r *FileAlertRepository) ListOpenBySymbol(ctx context.Context, symbol string) ([]alerts.Alert, error) {
 	_ = ctx
 	r.mu.RLock()

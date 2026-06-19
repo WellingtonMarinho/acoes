@@ -75,7 +75,7 @@ Entregas:
 
 Status:
 
-- Ainda não iniciado
+- Em andamento
 
 ### Fase 3. Push notifications de verdade
 
@@ -91,7 +91,7 @@ Entregas:
 
 Status:
 
-- Estrutura preparada, integração real ainda pendente
+- Estrutura parcial no backend e mobile, integração real ainda pendente
 
 ### Fase 4. Fonte real de cotações
 
@@ -146,7 +146,7 @@ Status:
 
 ## Ordem sugerida de execução
 
-1. Implementar o app Flutter mínimo.
+1. Consolidar o app Flutter mínimo.
 2. Integrar o backend com push notifications reais.
 3. Conectar uma fonte real de cotações.
 4. Migrar persistência para banco relacional.
@@ -187,7 +187,6 @@ Status:
 
 ## Próximos passos recomendados
 
-1. Iniciar o app Flutter com navegação básica.
+1. Consolidar a navegação e a sessão do app Flutter.
 2. Definir a integração de push real.
 3. Escolher a primeira fonte de preços da B3.
-

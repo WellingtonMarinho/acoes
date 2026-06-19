@@ -54,6 +54,10 @@ func (s *Service) ListAlerts(ctx context.Context) ([]Alert, error) {
 	return s.repo.List(ctx)
 }
 
+func (s *Service) ListAlertsByUser(ctx context.Context, userID string) ([]Alert, error) {
+	return s.repo.ListByUser(ctx, strings.TrimSpace(userID))
+}
+
 func (s *Service) CheckPrices(ctx context.Context, snapshots []PriceSnapshot) ([]Alert, error) {
 	var triggered []Alert
 

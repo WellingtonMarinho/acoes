@@ -131,6 +131,19 @@ func (r *testRepo) List(ctx context.Context) ([]Alert, error) {
 	return out, nil
 }
 
+func (r *testRepo) ListByUser(ctx context.Context, userID string) ([]Alert, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []Alert
+	for _, alert := range r.alerts {
+		if alert.UserID == userID {
+			out = append(out, alert)
+		}
+	}
+	return out, nil
+}
+
 func (r *testRepo) ListOpenBySymbol(ctx context.Context, symbol string) ([]Alert, error) {
 	_ = ctx
 	r.mu.Lock()

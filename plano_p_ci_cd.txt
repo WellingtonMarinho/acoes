@@ -1,0 +1,110 @@
+Você é um engenheiro de software sênior especializado em CI/CD, GitHub Actions, Go e Flutter.
+
+Objetivo:
+Implementar uma esteira de CI no GitHub Actions para este repositório, contemplando projetos Go e/ou Flutter presentes no código, incluindo testes, análise estática, lint, cobertura e checks de segurança quando aplicável.
+
+Antes de alterar arquivos:
+1. Inspecione a estrutura do repositório.
+2. Identifique se há projeto Go, Flutter ou ambos.
+3. Identifique os comandos reais disponíveis no projeto:
+   - Go: go.mod, packages, comandos de teste, makefile, scripts existentes.
+   - Flutter: pubspec.yaml, analysis_options.yaml, flavors, targets, comandos de build/test existentes.
+4. Reaproveite scripts, Makefile ou comandos já existentes sempre que fizer sentido.
+5. Não faça mudanças grandes na estrutura do projeto sem necessidade.
+
+Tarefas para projeto Go:
+1. Criar ou atualizar workflow em `.github/workflows/go-ci.yml`.
+2. Configurar execução em:
+   - push para `main`
+   - pull_request
+3. Usar `actions/checkout`.
+4. Usar `actions/setup-go`, preferencialmente lendo a versão do `go.mod` quando possível.
+5. Rodar:
+   - `go mod download`
+   - `go test ./... -race -coverprofile=coverage.out`
+   - `go vet ./...`
+   - `golangci-lint`
+   - `gosec`, se compatível com o projeto
+6. Gerar artifact com `coverage.out`.
+7. Evitar que o workflow fique excessivamente lento.
+8. Se `-race` causar incompatibilidade ou lentidão relevante, documentar no PR/comentário e deixar alternativa sem `-race`.
+
+Tarefas para projeto Flutter:
+1. Criar ou atualizar workflow em `.github/workflows/flutter-ci.yml`.
+2. Configurar execução em:
+   - push para `main`
+   - pull_request
+3. Usar `actions/checkout`.
+4. Usar uma action estável para instalar Flutter, como `subosito/flutter-action`.
+5. Rodar:
+   - `flutter pub get`
+   - `dart format --set-exit-if-changed .`
+   - `flutter analyze`
+   - `flutter test --coverage`
+6. Gerar artifact com `coverage/lcov.info`.
+7. Se houver build Android configurado, adicionar opcionalmente:
+   - `flutter build apk --release`
+   mas somente se não exigir secrets, keystore ou configuração ausente.
+8. Não configurar build iOS inicialmente, a menos que o projeto já tenha suporte e seja claramente necessário, pois exige runner macOS e consome mais minutos.
+
+Ferramentas de análise recomendadas:
+Para Go:
+- `golangci-lint`
+- `gosec`
+- `go vet`
+- cobertura via `go test -coverprofile`
+
+Para Flutter:
+- `flutter analyze`
+- `dart format`
+- `flutter test --coverage`
+- se o projeto ainda não tiver lint rules, avaliar adicionar `flutter_lints` ou `very_good_analysis`, escolhendo a opção menos disruptiva.
+- Não introduzir `very_good_analysis` se isso gerar uma quantidade muito grande de quebras sem combinar antes; nesse caso, deixar recomendação documentada.
+
+CodeQL:
+1. Avaliar se faz sentido criar `.github/workflows/codeql.yml`.
+2. Se houver Go, configurar CodeQL para Go.
+3. Para Flutter/Dart, não forçar CodeQL se não houver suporte adequado no projeto.
+4. O workflow deve rodar em pull requests e push na main.
+
+Codecov/Sonar/etc:
+1. Não adicionar serviços externos que dependam de token/secrets sem necessidade.
+2. Se for simples, deixar comentários/documentação mostrando como integrar Codecov no futuro.
+3. Não configurar SonarCloud/SonarQube agora, a menos que já existam tokens/configuração no repositório.
+
+Requisitos de qualidade dos workflows:
+1. Usar nomes claros para os jobs.
+2. Usar cache quando fizer sentido:
+   - Go modules/build cache
+   - Flutter pub cache
+3. Evitar duplicação excessiva.
+4. Garantir que os workflows falhem corretamente quando testes, análise ou lint falharem.
+5. Garantir que os arquivos YAML sejam válidos.
+6. Usar versões fixas/estáveis das actions principais.
+7. Não usar actions obscuras ou pouco confiáveis.
+
+Entregáveis:
+1. Criar/atualizar arquivos em `.github/workflows/`.
+2. Se necessário, criar ou ajustar `analysis_options.yaml` para Flutter de forma conservadora.
+3. Se necessário, criar ou ajustar `.golangci.yml` para Go com configuração inicial razoável.
+4. Atualizar `README.md` ou criar uma seção `CI/CD` explicando:
+   - quais checks rodam
+   - quando rodam
+   - como rodar localmente os mesmos comandos
+   - como interpretar cobertura
+5. Ao final, apresentar um resumo das mudanças feitas e os comandos equivalentes para rodar localmente.
+
+Critérios de aceite:
+1. Em pull requests, a esteira deve validar testes e qualidade de código.
+2. Para Go, deve rodar ao menos `go test`, `go vet` e `golangci-lint`.
+3. Para Flutter, deve rodar ao menos `flutter analyze`, `dart format` e `flutter test`.
+4. Cobertura deve ser gerada como artifact.
+5. O workflow não deve depender de secrets para funcionar.
+6. O CI deve funcionar em GitHub Actions usando runners gratuitos, preferencialmente `ubuntu-latest`.
+7. Não quebrar o projeto nem alterar lógica de aplicação.
+
+Importante:
+- Faça uma implementação incremental e conservadora.
+- Priorize funcionar bem em repositório pequeno/pessoal.
+- Não adicione complexidade desnecessária.
+- Se encontrar incompatibilidade, documente a limitação e implemente a alternativa mais simples e segura.

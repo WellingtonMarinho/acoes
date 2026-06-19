@@ -12,10 +12,13 @@ Arquivos para validar a API do backend no Postman.
 1. Importa a collection no Postman.
 2. Importa o environment local.
 3. Seleciona o environment `Ideacoes Local`.
-4. Atualiza o preço via `PUT /prices`.
+4. Executa `POST /auth/token` e guarda o `accessToken` no environment.
 5. Registra o device token via `POST /devices/register`.
 6. Cria alertas via `POST /alerts`.
-7. Aguarda o worker ou usa `POST /prices/check` para validação manual.
+7. Atualiza o preço via `PUT /prices`.
+8. Aguarda o worker ou usa `POST /prices/check` para validação manual.
+
+> As rotas `GET /alerts`, `GET /devices`, `POST /alerts` e `POST /devices/register` exigem `Authorization: Bearer <token>`.
 
 ## Base URL
 

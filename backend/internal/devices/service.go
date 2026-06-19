@@ -18,6 +18,10 @@ func (s *Service) List(ctx context.Context) ([]Registration, error) {
 	return s.repo.List(ctx)
 }
 
+func (s *Service) ListByUser(ctx context.Context, userID string) ([]Registration, error) {
+	return s.repo.ListByUser(ctx, userID)
+}
+
 func (s *Service) Resolve(ctx context.Context, userID string) (string, bool, error) {
 	registration, ok, err := s.repo.Resolve(ctx, userID)
 	if err != nil || !ok {

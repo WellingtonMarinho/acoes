@@ -7,6 +7,39 @@
   },
   "item": [
     {
+      "name": "Issue Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"user-001\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/token",
+        "description": "Emite um JWT temporário para o usuário informado no MVP."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "if (body.access_token) {",
+              "  pm.environment.set('accessToken', body.access_token);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
       "name": "Healthcheck",
       "request": {
         "method": "GET",
@@ -19,7 +52,12 @@
       "name": "List Alerts",
       "request": {
         "method": "GET",
-        "header": [],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/alerts"
       },
       "response": []
@@ -32,11 +70,15 @@
           {
             "key": "Content-Type",
             "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
           }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"user_id\": \"user-001\",\n  \"symbol\": \"PETR4\",\n  \"target_price\": 40.50,\n  \"direction\": \"above\",\n  \"device_token\": \"device-token-example\"\n}"
+          "raw": "{\n  \"symbol\": \"PETR4\",\n  \"target_price\": 40.50,\n  \"direction\": \"above\",\n  \"device_token\": \"device-token-example\"\n}"
         },
         "url": "{{baseUrl}}/alerts",
         "description": "Cria um alerta de preço para um ativo da B3."
@@ -47,7 +89,12 @@
       "name": "List Devices",
       "request": {
         "method": "GET",
-        "header": [],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/devices"
       },
       "response": []
@@ -60,11 +107,15 @@
           {
             "key": "Content-Type",
             "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
           }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"user_id\": \"user-001\",\n  \"device_token\": \"device-token-example\",\n  \"platform\": \"android\"\n}"
+          "raw": "{\n  \"device_token\": \"device-token-example\",\n  \"platform\": \"android\"\n}"
         },
         "url": "{{baseUrl}}/devices/register",
         "description": "Registra o token de push de um usuário para uso nos alertas."

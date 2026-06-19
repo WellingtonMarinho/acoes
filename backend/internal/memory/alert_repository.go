@@ -48,6 +48,24 @@ func (r *AlertRepository) List(ctx context.Context) ([]alerts.Alert, error) {
 	return out, nil
 }
 
+func (r *AlertRepository) ListByUser(ctx context.Context, userID string) ([]alerts.Alert, error) {
+	_ = ctx
+	userID = strings.TrimSpace(userID)
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var out []alerts.Alert
+	for _, alert := range r.alerts {
+		if alert.UserID == userID {
+			out = append(out, alert)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out, nil
+}
+
 func (r *AlertRepository) ListOpenBySymbol(ctx context.Context, symbol string) ([]alerts.Alert, error) {
 	_ = ctx
 	r.mu.RLock()
