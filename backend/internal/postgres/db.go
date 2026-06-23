@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -14,10 +15,14 @@ func Open(ctx context.Context, dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("ping postgres: %w", err)
+	var pingErr error
+	for attempts := 0; attempts < 20; attempts++ {
+		if pingErr = db.PingContext(ctx); pingErr == nil {
+			return db, nil
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 
-	return db, nil
+	_ = db.Close()
+	return nil, fmt.Errorf("ping postgres: %w", pingErr)
 }

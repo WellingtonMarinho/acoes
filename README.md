@@ -96,6 +96,7 @@ O repositório tem pipelines separados por stack em `.github/workflows/`.
 - Executa em `push` para `main` e em `pull_request`
 - Roda `go mod download`
 - Roda `go test ./... -race -coverprofile=coverage.out`
+- Roda `go test -tags=integration ./internal/postgres`
 - Roda `go vet ./...`
 - Roda `golangci-lint`
 - Roda `gosec`
@@ -107,6 +108,7 @@ Comandos locais equivalentes:
 cd backend
 go mod download
 go test ./... -race -coverprofile=coverage.out
+go test -tags=integration ./internal/postgres
 go vet ./...
 golangci-lint run
 gosec ./...

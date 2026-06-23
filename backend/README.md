@@ -68,4 +68,7 @@ Na raiz do projeto:
 
 ```bash
 make test-backend
+make test-backend-integration
 ```
+
+O segundo comando sobe um Postgres temporário via Testcontainers e valida persistência real de alertas e devices.
