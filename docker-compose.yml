@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ideacoes-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ideacoes
+      POSTGRES_USER: ideacoes
+      POSTGRES_PASSWORD: ideacoes
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ideacoes-backend
+    depends_on:
+      - postgres
+    environment:
+      HTTP_ADDR: :8080
+      JWT_SECRET: dev-secret
+      DATABASE_URL: postgres://ideacoes:ideacoes@postgres:5432/ideacoes?sslmode=disable
+      ALERTS_STORE_PATH: /data/alerts.json
+      DEVICES_STORE_PATH: /data/devices.json
+      MONITOR_INTERVAL_SECONDS: 10
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend_data:/data
+
+volumes:
+  postgres_data:
+  backend_data:

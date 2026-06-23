@@ -41,6 +41,8 @@ DEVICES_STORE_PATH=./data/devices.json
 ```
 
 O worker de monitoramento usa `MONITOR_INTERVAL_SECONDS` e, por padrão, roda a cada 10 segundos.
+O feed de preços também é configurável: por padrão usa memória, mas você pode apontar para Twelve Data com `PRICEFEED_PROVIDER=twelvedata` e `TWELVEDATA_API_KEY`.
+Se `DATABASE_URL` estiver definido, o backend usa o Postgres do `docker compose` para alertas e devices.
 
 Fluxo sugerido para teste:
 
@@ -51,6 +53,17 @@ Fluxo sugerido para teste:
 5. Aguarde o worker ou force a checagem com `POST /prices/check`.
 
 > `GET /alerts`, `GET /devices`, `POST /alerts` e `POST /devices/register` exigem `Authorization: Bearer <token>`.
+
+### Subida com Docker
+
+Para subir backend e Postgres com Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+O backend ficará em `http://localhost:8080` e o Postgres em `localhost:5432`.
+Por enquanto o backend ainda usa armazenamento em memória/arquivo; o Postgres já está pronto na infraestrutura para a próxima etapa.
 
 ## Mobile
 
@@ -63,6 +76,17 @@ O app Flutter já está sendo estruturado com:
 
 O próximo passo é consolidar a integração do mobile com o backend protegido.
 
+### Comandos úteis
+
+Na raiz do projeto:
+
+```bash
+make run-backend
+make test-backend
+make run-mobile
+make test-mobile
+```
+
 ## CI/CD
 
 O repositório tem pipelines separados por stack em `.github/workflows/`.
@@ -72,6 +96,7 @@ O repositório tem pipelines separados por stack em `.github/workflows/`.
 - Executa em `push` para `main` e em `pull_request`
 - Roda `go mod download`
 - Roda `go test ./... -race -coverprofile=coverage.out`
+- Roda `go test -tags=integration ./internal/postgres`
 - Roda `go vet ./...`
 - Roda `golangci-lint`
 - Roda `gosec`
@@ -83,6 +108,7 @@ Comandos locais equivalentes:
 cd backend
 go mod download
 go test ./... -race -coverprofile=coverage.out
+go test -tags=integration ./internal/postgres
 go vet ./...
 golangci-lint run
 gosec ./...

@@ -6,11 +6,7 @@ import '../data/devices_remote_repository.dart';
 import '../data/devices_repository.dart';
 
 final devicesRepositoryProvider = Provider<DevicesRepository>((ref) {
-  final session = ref.watch(sessionControllerProvider);
-  return DevicesRemoteRepository(
-    ref.watch(apiClientProvider),
-    accessToken: session?.accessToken ?? '',
-  );
+  return DevicesRemoteRepository(ref.watch(apiClientProvider));
 });
 
 final activeDevicesRepositoryProvider = Provider<DevicesRepository>((ref) {

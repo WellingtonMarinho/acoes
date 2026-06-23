@@ -9,13 +9,14 @@ Arquivo central para registrar dívidas técnicas e itens que não devem passar 
 - [ ] Trocar o feed local de preços por uma fonte real de cotações da B3.
 - [ ] Avaliar persistência em banco relacional quando o fluxo sair do MVP.
 - [ ] Revisar prevenção de disparos duplicados no worker de monitoramento.
+- [x] Cobrir o caminho principal do MVP com teste de integração ponta a ponta.
 
 ## Acompanhamento do mobile
 
 - [ ] Refinar a experiência pós-submit nas telas de alerta e device.
-- [ ] Cobrir com testes os fluxos principais do app Flutter.
-- [ ] Consolidar a integração do app com o backend protegido.
 - [ ] Adicionar watchlist e histórico visível na interface.
+- [x] Cobrir com testes os fluxos principais do app Flutter.
+- [x] Consolidar a integração do app com o backend protegido.
 
 ## Observações
 

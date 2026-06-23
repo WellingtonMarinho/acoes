@@ -9,11 +9,6 @@ import (
 	"ideacoes/backend/internal/alerts"
 )
 
-type Feed interface {
-	List(ctx context.Context) ([]alerts.PriceSnapshot, error)
-	Upsert(ctx context.Context, snapshot alerts.PriceSnapshot) error
-}
-
 type MemoryFeed struct {
 	mu        sync.RWMutex
 	snapshots map[string]alerts.PriceSnapshot
@@ -47,5 +42,20 @@ func (f *MemoryFeed) Upsert(ctx context.Context, snapshot alerts.PriceSnapshot) 
 
 	snapshot.Symbol = strings.ToUpper(strings.TrimSpace(snapshot.Symbol))
 	f.snapshots[snapshot.Symbol] = snapshot
+	return nil
+}
+
+func (f *MemoryFeed) RegisterSymbol(ctx context.Context, symbol string) error {
+	_ = ctx
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	if symbol == "" {
+		return nil
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.snapshots[symbol]; !ok {
+		f.snapshots[symbol] = alerts.PriceSnapshot{Symbol: symbol}
+	}
 	return nil
 }

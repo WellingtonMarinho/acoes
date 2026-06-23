@@ -18,6 +18,17 @@ class ApiClient {
     return _decodeObject(response.body);
   }
 
+  Future<Map<String, dynamic>> getJsonWithHeaders(
+    String path, {
+    Map<String, String>? headers,
+  }) async {
+    final response = await _client.get(
+      _uri(path),
+      headers: headers,
+    );
+    return _decodeObject(response.body);
+  }
+
   Future<Map<String, dynamic>> postJson(
     String path, {
     Map<String, dynamic>? body,

@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  backend-ci:
     name: Go checks
     runs-on: ubuntu-latest
     defaults:
@@ -29,8 +29,11 @@ jobs:
       - name: Download modules
         run: go mod download
 
-      - name: Run tests
+      - name: Run unit tests
         run: go test ./... -race -coverprofile=coverage.out
+
+      - name: Run integration tests
+        run: go test -tags=integration ./internal/postgres
 
       - name: Run vet
         run: go vet ./...
