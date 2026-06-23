@@ -10,7 +10,12 @@ class AlertsRemoteRepository implements AlertsRepository {
 
   @override
   Future<List<Alert>> listAlerts() async {
-    final data = await _client.getJson('/alerts');
+    final data = await _client.getJsonWithHeaders(
+      '/alerts',
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
     final items = data['items'];
     if (items is List<dynamic>) {
       final out = <Alert>[];

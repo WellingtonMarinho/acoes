@@ -41,6 +41,8 @@ DEVICES_STORE_PATH=./data/devices.json
 ```
 
 O worker de monitoramento usa `MONITOR_INTERVAL_SECONDS` e, por padrão, roda a cada 10 segundos.
+O feed de preços também é configurável: por padrão usa memória, mas você pode apontar para Twelve Data com `PRICEFEED_PROVIDER=twelvedata` e `TWELVEDATA_API_KEY`.
+Se `DATABASE_URL` estiver definido, o backend usa o Postgres do `docker compose` para alertas e devices.
 
 Fluxo sugerido para teste:
 
@@ -52,6 +54,17 @@ Fluxo sugerido para teste:
 
 > `GET /alerts`, `GET /devices`, `POST /alerts` e `POST /devices/register` exigem `Authorization: Bearer <token>`.
 
+### Subida com Docker
+
+Para subir backend e Postgres com Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+O backend ficará em `http://localhost:8080` e o Postgres em `localhost:5432`.
+Por enquanto o backend ainda usa armazenamento em memória/arquivo; o Postgres já está pronto na infraestrutura para a próxima etapa.
+
 ## Mobile
 
 O app Flutter já está sendo estruturado com:
@@ -62,6 +75,17 @@ O app Flutter já está sendo estruturado com:
 - sessão provisória com persistência local
 
 O próximo passo é consolidar a integração do mobile com o backend protegido.
+
+### Comandos úteis
+
+Na raiz do projeto:
+
+```bash
+make run-backend
+make test-backend
+make run-mobile
+make test-mobile
+```
 
 ## CI/CD
 

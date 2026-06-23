@@ -2,10 +2,9 @@ import '../../../core/network/api_client.dart';
 import 'devices_repository.dart';
 
 class DevicesRemoteRepository implements DevicesRepository {
-  DevicesRemoteRepository(this._client, {required this.accessToken});
+  DevicesRemoteRepository(this._client);
 
   final ApiClient _client;
-  final String accessToken;
 
   @override
   Future<void> registerDevice({

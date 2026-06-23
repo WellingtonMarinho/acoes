@@ -14,6 +14,10 @@ type Config struct {
 	MonitorInterval  time.Duration
 	AlertsStorePath  string
 	DevicesStorePath string
+	DatabaseURL      string
+	PriceFeedProvider string
+	TwelveDataAPIKey  string
+	TwelveDataBaseURL string
 }
 
 func LoadConfig() Config {
@@ -23,6 +27,10 @@ func LoadConfig() Config {
 		MonitorInterval:  monitorInterval(),
 		AlertsStorePath:  os.Getenv("ALERTS_STORE_PATH"),
 		DevicesStorePath: os.Getenv("DEVICES_STORE_PATH"),
+		DatabaseURL:      os.Getenv("DATABASE_URL"),
+		PriceFeedProvider: envOrDefault("PRICEFEED_PROVIDER", "memory"),
+		TwelveDataAPIKey:  os.Getenv("TWELVEDATA_API_KEY"),
+		TwelveDataBaseURL: envOrDefault("TWELVEDATA_BASE_URL", "https://api.twelvedata.com"),
 	}
 }
 

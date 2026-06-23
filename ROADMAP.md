@@ -75,7 +75,7 @@ Entregas:
 
 Status:
 
-- Em andamento
+- Concluída para o MVP testável
 
 ### Fase 3. Push notifications de verdade
 
@@ -187,6 +187,6 @@ Status:
 
 ## Próximos passos recomendados
 
-1. Consolidar a navegação e a sessão do app Flutter.
-2. Definir a integração de push real.
-3. Escolher a primeira fonte de preços da B3.
+1. Definir a integração de push real.
+2. Escolher a primeira fonte de preços da B3.
+3. Evoluir a identidade provisória para login real.

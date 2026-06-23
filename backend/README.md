@@ -4,14 +4,14 @@ API em Go para alertas de ações da B3.
 
 ## Como subir localmente
 
-Na raiz do projeto, rode:
+Na raiz do projeto:
 
 ```bash
-cd backend
-go run ./cmd/api
+make run-backend
 ```
 
-Por padrão, o servidor sobe em `http://localhost:8080`.
+Isso sobe o backend em `http://localhost:8080` e um Postgres em `localhost:5432`.
+Quando `DATABASE_URL` estiver definido, o backend usa o Postgres para alertas e devices.
 
 ## Variáveis de ambiente
 
@@ -20,6 +20,10 @@ Por padrão, o servidor sobe em `http://localhost:8080`.
 - `MONITOR_INTERVAL_SECONDS`: intervalo do worker de monitoramento. Padrão: `10`
 - `ALERTS_STORE_PATH`: caminho do arquivo de persistência dos alertas
 - `DEVICES_STORE_PATH`: caminho do arquivo de persistência dos devices
+- `DATABASE_URL`: string de conexão do Postgres. Quando definida, o backend usa persistência relacional
+- `PRICEFEED_PROVIDER`: provedor de preços. Padrão: `memory`. Use `twelvedata` para buscar cotações externas
+- `TWELVEDATA_API_KEY`: chave da Twelve Data, obrigatória quando `PRICEFEED_PROVIDER=twelvedata`
+- `TWELVEDATA_BASE_URL`: URL base da API da Twelve Data. Padrão: `https://api.twelvedata.com`
 
 Exemplo com persistência em arquivo:
 
@@ -28,8 +32,13 @@ cd backend
 JWT_SECRET=dev-secret \
 ALERTS_STORE_PATH=./data/alerts.json \
 DEVICES_STORE_PATH=./data/devices.json \
+PRICEFEED_PROVIDER=twelvedata \
+TWELVEDATA_API_KEY=your-api-key \
 go run ./cmd/api
 ```
+
+Se `PRICEFEED_PROVIDER` não for definido, o backend continua usando o feed em memória para o MVP.
+Se `DATABASE_URL` não for definido, o backend continua usando os repositórios em memória/arquivo do MVP.
 
 ## Endpoints
 
@@ -52,3 +61,11 @@ A collection fica em `backend/docs/postman/`:
 
 - `ideacoes-b3-alerts.postman_collection.json`
 - `ideacoes-b3-alerts.postman_environment.json`
+
+## Testes
+
+Na raiz do projeto:
+
+```bash
+make test-backend
+```

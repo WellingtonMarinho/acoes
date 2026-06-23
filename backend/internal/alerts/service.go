@@ -18,14 +18,23 @@ type DeviceResolver interface {
 	Resolve(ctx context.Context, userID string) (string, bool, error)
 }
 
+type SymbolRegistrar interface {
+	RegisterSymbol(ctx context.Context, symbol string) error
+}
+
 type Service struct {
 	repo     Repository
 	notifier Notifier
 	devices  DeviceResolver
+	symbols  SymbolRegistrar
 }
 
 func NewService(repo Repository, notifier Notifier, devices DeviceResolver) *Service {
 	return &Service{repo: repo, notifier: notifier, devices: devices}
+}
+
+func NewServiceWithSymbolRegistrar(repo Repository, notifier Notifier, devices DeviceResolver, symbols SymbolRegistrar) *Service {
+	return &Service{repo: repo, notifier: notifier, devices: devices, symbols: symbols}
 }
 
 func (s *Service) CreateAlert(ctx context.Context, alert Alert) (Alert, error) {
@@ -41,6 +50,11 @@ func (s *Service) CreateAlert(ctx context.Context, alert Alert) (Alert, error) {
 			return Alert{}, err
 		} else if ok {
 			alert.DeviceToken = token
+		}
+	}
+	if s.symbols != nil {
+		if err := s.symbols.RegisterSymbol(ctx, alert.Symbol); err != nil {
+			return Alert{}, err
 		}
 	}
 
