@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strings"
 	"sync"
@@ -10,8 +9,6 @@ import (
 
 	"ideacoes/backend/internal/alerts"
 )
-
-var errAlertNotFound = errors.New("alert not found")
 
 type AlertRepository struct {
 	mu     sync.RWMutex
@@ -84,6 +81,59 @@ func (r *AlertRepository) ListOpenBySymbol(ctx context.Context, symbol string) (
 	return out, nil
 }
 
+func (r *AlertRepository) Get(ctx context.Context, id string) (alerts.Alert, error) {
+	_ = ctx
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	alert, ok := r.alerts[id]
+	if !ok {
+		return alerts.Alert{}, alerts.ErrAlertNotFound
+	}
+	return alert, nil
+}
+
+func (r *AlertRepository) Update(ctx context.Context, alert alerts.Alert) (alerts.Alert, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.alerts[alert.ID]; !ok {
+		return alerts.Alert{}, alerts.ErrAlertNotFound
+	}
+	r.alerts[alert.ID] = alert
+	return alert, nil
+}
+
+func (r *AlertRepository) Delete(ctx context.Context, id string) error {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.alerts[id]; !ok {
+		return alerts.ErrAlertNotFound
+	}
+	delete(r.alerts, id)
+	return nil
+}
+
+func (r *AlertRepository) DeleteByUserAndAction(ctx context.Context, userID, actionID string) (int64, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	userID = strings.TrimSpace(userID)
+	actionID = strings.TrimSpace(actionID)
+	var deleted int64
+	for id, alert := range r.alerts {
+		if alert.UserID == userID && alert.ActionID == actionID {
+			delete(r.alerts, id)
+			deleted++
+		}
+	}
+	return deleted, nil
+}
+
 func (r *AlertRepository) MarkTriggered(ctx context.Context, id string, triggeredAt time.Time) (alerts.Alert, error) {
 	_ = ctx
 	r.mu.Lock()
@@ -91,11 +141,15 @@ func (r *AlertRepository) MarkTriggered(ctx context.Context, id string, triggere
 
 	alert, ok := r.alerts[id]
 	if !ok {
-		return alerts.Alert{}, errAlertNotFound
+		return alerts.Alert{}, alerts.ErrAlertNotFound
+	}
+	if alert.Status != alerts.AlertStatusOpen {
+		return alerts.Alert{}, alerts.ErrAlertNotEditable
 	}
 
 	alert.Status = alerts.AlertStatusTriggered
 	alert.TriggeredAt = &triggeredAt
+	alert.UpdatedAt = triggeredAt
 	r.alerts[id] = alert
 	return alert, nil
 }

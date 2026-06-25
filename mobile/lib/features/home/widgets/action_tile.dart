@@ -17,7 +17,7 @@ class ActionTile extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Material(
-      color: Colors.white,
+      color: colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(color: colors.outlineVariant),

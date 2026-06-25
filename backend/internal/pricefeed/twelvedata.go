@@ -9,16 +9,17 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"ideacoes/backend/internal/alerts"
 )
 
 type TwelveDataFeed struct {
-	client   *http.Client
-	baseURL  string
-	apiKey   string
-	mu       sync.RWMutex
-	symbols  map[string]struct{}
+	client    *http.Client
+	baseURL   string
+	apiKey    string
+	mu        sync.RWMutex
+	symbols   map[string]struct{}
 	overrides map[string]alerts.PriceSnapshot
 }
 
@@ -140,7 +141,8 @@ func (f *TwelveDataFeed) fetchQuote(ctx context.Context, symbol string) (alerts.
 			Symbol string `json:"symbol"`
 		} `json:"meta"`
 		Values []struct {
-			Close string `json:"close"`
+			Close    string `json:"close"`
+			Datetime string `json:"datetime"`
 		} `json:"values"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
@@ -155,8 +157,33 @@ func (f *TwelveDataFeed) fetchQuote(ctx context.Context, symbol string) (alerts.
 		return alerts.PriceSnapshot{}, err
 	}
 
+	var observedAt time.Time
+	if parsed, err := parseQuoteTime(payload.Values[0].Datetime); err == nil {
+		observedAt = parsed
+	}
+
 	return alerts.PriceSnapshot{
-		Symbol: strings.ToUpper(strings.TrimSpace(symbol)),
-		Price:  price,
+		Symbol:     strings.ToUpper(strings.TrimSpace(symbol)),
+		Price:      price,
+		ObservedAt: observedAt,
 	}, nil
+}
+
+func parseQuoteTime(raw string) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, fmt.Errorf("empty quote datetime")
+	}
+
+	layouts := []string{
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+	}
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, raw); err == nil {
+			return parsed.UTC(), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unsupported quote datetime %q", raw)
 }

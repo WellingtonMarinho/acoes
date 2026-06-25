@@ -1,36 +1,120 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/providers.dart';
-import '../domain/alert.dart';
-import 'alert_form_controller.dart';
-import 'alerts_controller.dart';
+import '../../../core/network/api_client.dart';
+import '../../actions/domain/action.dart' as stock_action;
+import '../../actions/presentation/actions_controller.dart';
 import '../../session/presentation/session_controller.dart';
+import '../../watchlist/presentation/watchlist_controller.dart';
+import '../domain/alert.dart';
+import 'alerts_controller.dart';
 
-class CreateAlertPage extends ConsumerStatefulWidget {
-  const CreateAlertPage({super.key});
+class CreateAlertPage extends StatelessWidget {
+  const CreateAlertPage({super.key, this.initialAction});
+
+  final stock_action.MarketAction? initialAction;
 
   @override
-  ConsumerState<CreateAlertPage> createState() => _CreateAlertPageState();
+  Widget build(BuildContext context) {
+    return AlertFormPage(
+      title: 'Novo alerta',
+      submitLabel: 'Salvar alerta',
+      initialAction: initialAction,
+    );
+  }
 }
 
-class _CreateAlertPageState extends ConsumerState<CreateAlertPage> {
+class EditAlertPage extends StatelessWidget {
+  const EditAlertPage({
+    super.key,
+    required this.alert,
+  });
+
+  final Alert alert;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertFormPage(
+      title: 'Editar alerta',
+      submitLabel: 'Salvar alterações',
+      alert: alert,
+      allowActionSelection: false,
+    );
+  }
+}
+
+class AlertFormPage extends ConsumerStatefulWidget {
+  const AlertFormPage({
+    super.key,
+    required this.title,
+    required this.submitLabel,
+    this.initialAction,
+    this.alert,
+    this.allowActionSelection = true,
+  });
+
+  final String title;
+  final String submitLabel;
+  final stock_action.MarketAction? initialAction;
+  final Alert? alert;
+  final bool allowActionSelection;
+
+  @override
+  ConsumerState<AlertFormPage> createState() => _AlertFormPageState();
+}
+
+class _AlertFormPageState extends ConsumerState<AlertFormPage> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _symbolController;
   late final TextEditingController _priceController;
+  stock_action.MarketAction? _selectedAction;
+  AlertDirection _direction = AlertDirection.above;
   bool _submitting = false;
+
+  bool get _editing => widget.alert != null;
 
   @override
   void initState() {
     super.initState();
-    final draft = ref.read(alertFormControllerProvider);
-    _symbolController = TextEditingController(text: draft.symbol);
-    _priceController = TextEditingController(text: draft.targetPrice);
+    _selectedAction = widget.initialAction ??
+        (widget.alert == null
+            ? null
+            : stock_action.MarketAction(
+                id: widget.alert!.actionId,
+                symbol: widget.alert!.symbol,
+                name: widget.alert!.actionName.isEmpty
+                    ? widget.alert!.symbol
+                    : widget.alert!.actionName,
+                exchange: '',
+              ));
+    _direction = widget.alert?.direction ?? AlertDirection.above;
+    _priceController = TextEditingController(
+      text: widget.alert?.targetPrice.toStringAsFixed(2) ?? '',
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bootstrapAction();
+    });
+  }
+
+  Future<void> _bootstrapAction() async {
+    if (_selectedAction != null || !_editing) {
+      return;
+    }
+    final actions = await ref.read(actionsRepositoryProvider).listActions();
+    if (!mounted) {
+      return;
+    }
+    final matched =
+        actions.where((action) => action.id == widget.alert!.actionId).toList();
+    if (matched.isNotEmpty) {
+      setState(() {
+        _selectedAction = matched.first;
+      });
+    }
   }
 
   @override
   void dispose() {
-    _symbolController.dispose();
     _priceController.dispose();
     super.dispose();
   }
@@ -39,46 +123,72 @@ class _CreateAlertPageState extends ConsumerState<CreateAlertPage> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    if (!_editing && _selectedAction == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecione uma ação.')),
+      );
+      return;
+    }
+
+    final session = ref.read(sessionControllerProvider);
+    if (session == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Entre no app para salvar o alerta.')),
+      );
+      return;
+    }
+
+    final targetPrice =
+        double.parse(_priceController.text.replaceAll(',', '.'));
+    final repo = ref.read(activeAlertsRepositoryProvider);
+
     setState(() {
       _submitting = true;
     });
 
-    final draft = ref.read(alertFormControllerProvider);
-    final symbol = draft.symbol.trim().toUpperCase();
-    final targetPrice = double.parse(draft.targetPrice.replaceAll(',', '.'));
-    final session = ref.read(sessionControllerProvider);
-
-    if (session == null && !ref.read(appConfigProvider).useDemoData) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Entre no app para salvar no backend.')),
-      );
-      setState(() {
-        _submitting = false;
-      });
-      return;
-    }
-
     try {
-      await ref.read(activeAlertsRepositoryProvider).createAlert(
-            userId: session?.userId ?? 'user-demo',
-            symbol: symbol,
-            targetPrice: targetPrice,
-            direction: draft.direction,
-          );
-      ref.invalidate(alertsControllerProvider);
+      if (_editing) {
+        await repo.updateAlert(
+          alertId: widget.alert!.id,
+          targetPrice: targetPrice,
+          direction: _direction,
+        );
+      } else {
+        await repo.createAlert(
+          userId: session.userId,
+          actionId: _selectedAction!.id,
+          targetPrice: targetPrice,
+          direction: _direction,
+        );
+        await ref
+            .read(activeWatchlistRepositoryProvider)
+            .addWatchlist(_selectedAction!.id);
+      }
 
+      ref.invalidate(alertsControllerProvider);
+      ref.invalidate(watchlistControllerProvider);
+
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Alerta de $symbol salvo com sucesso.'),
-        ),
+            content: Text(
+                _editing ? 'Alerta atualizado.' : 'Alerta salvo com sucesso.')),
       );
-      ref.read(alertFormControllerProvider.notifier).reset();
-      _symbolController.clear();
-      _priceController.clear();
-      if (mounted) {
-        Navigator.of(context).pop();
+      context.pop();
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiClient.friendlyMessageFor(error))),
+      );
     } catch (error) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Falha ao salvar alerta: $error')),
       );
@@ -93,30 +203,55 @@ class _CreateAlertPageState extends ConsumerState<CreateAlertPage> {
 
   @override
   Widget build(BuildContext context) {
-    final draft = ref.watch(alertFormControllerProvider);
+    final actions = ref.watch(actionsControllerProvider);
+    final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Novo alerta')),
+      appBar: AppBar(title: Text(widget.title)),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            TextFormField(
-              controller: _symbolController,
-              decoration: const InputDecoration(
-                labelText: 'Ativo',
-                hintText: 'PETR4',
+            if (_editing)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ação monitorada',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${widget.alert!.symbol} · ${widget.alert!.actionName.isEmpty ? widget.alert!.symbol : widget.alert!.actionName}',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (widget.allowActionSelection)
+              actions.when(
+                data: (items) => _ActionField(
+                  actions: items,
+                  selected: _selectedAction,
+                  onChanged: (value) => setState(() {
+                    _selectedAction = value;
+                  }),
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (error, stackTrace) =>
+                    Text('Falha ao carregar ações: $error'),
               ),
-              textCapitalization: TextCapitalization.characters,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Informe o ativo.';
-                }
-                return null;
-              },
-              onChanged: ref.read(alertFormControllerProvider.notifier).setSymbol,
-            ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _priceController,
@@ -124,15 +259,16 @@ class _CreateAlertPageState extends ConsumerState<CreateAlertPage> {
                 labelText: 'Preço alvo',
                 hintText: '40.50',
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               validator: (value) {
-                final parsed = double.tryParse((value ?? '').replaceAll(',', '.'));
+                final parsed =
+                    double.tryParse((value ?? '').replaceAll(',', '.'));
                 if (parsed == null || parsed <= 0) {
                   return 'Informe um preço válido.';
                 }
                 return null;
               },
-              onChanged: ref.read(alertFormControllerProvider.notifier).setTargetPrice,
             ),
             const SizedBox(height: 16),
             SegmentedButton<AlertDirection>(
@@ -148,19 +284,60 @@ class _CreateAlertPageState extends ConsumerState<CreateAlertPage> {
                   icon: Icon(Icons.trending_down),
                 ),
               ],
-              selected: {draft.direction},
+              selected: {_direction},
               onSelectionChanged: (value) {
-                ref.read(alertFormControllerProvider.notifier).setDirection(value.first);
+                setState(() {
+                  _direction = value.first;
+                });
               },
             ),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _submitting ? null : _submit,
-              child: Text(_submitting ? 'Salvando...' : 'Salvar alerta'),
+              child: Text(_submitting ? 'Salvando...' : widget.submitLabel),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ActionField extends StatelessWidget {
+  const _ActionField({
+    required this.actions,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final List<stock_action.MarketAction> actions;
+  final stock_action.MarketAction? selected;
+  final ValueChanged<stock_action.MarketAction> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: selected?.id,
+      decoration: const InputDecoration(labelText: 'Ação'),
+      items: [
+        for (final action in actions)
+          DropdownMenuItem(
+            value: action.id,
+            child: Text('${action.symbol} · ${action.name}'),
+          ),
+      ],
+      validator: (value) => value == null ? 'Selecione uma ação.' : null,
+      onChanged: (value) {
+        if (value == null) {
+          return;
+        }
+        for (final action in actions) {
+          if (action.id == value) {
+            onChanged(action);
+            return;
+          }
+        }
+      },
     );
   }
 }

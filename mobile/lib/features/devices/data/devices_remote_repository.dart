@@ -8,15 +8,11 @@ class DevicesRemoteRepository implements DevicesRepository {
 
   @override
   Future<void> registerDevice({
-    required String accessToken,
     required String deviceToken,
     required String platform,
   }) async {
     await _client.postJson(
       '/devices/register',
-      headers: {
-        'Authorization': 'Bearer $accessToken',
-      },
       body: {
         'device_token': deviceToken,
         'platform': platform,

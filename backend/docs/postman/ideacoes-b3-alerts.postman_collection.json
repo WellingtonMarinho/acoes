@@ -49,6 +49,78 @@
       "response": []
     },
     {
+      "name": "List Actions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/actions",
+        "description": "Lista as ações disponíveis para criar alertas."
+      },
+      "response": []
+    },
+    {
+      "name": "Search Actions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/actions?query=Petrobras%20PN",
+        "description": "Busca exata por nome no catálogo de ações."
+      },
+      "response": []
+    },
+    {
+      "name": "List Watchlist",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/watchlist"
+      },
+      "response": []
+    },
+    {
+      "name": "Add Watchlist",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action_id\": \"action-petr4\"\n}"
+        },
+        "url": "{{baseUrl}}/watchlist",
+        "description": "Adiciona uma ação à watchlist do usuário."
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Watchlist",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/watchlist/action-petr4",
+        "description": "Remove a ação da watchlist e apaga os alertas vinculados."
+      },
+      "response": []
+    },
+    {
       "name": "List Alerts",
       "request": {
         "method": "GET",
@@ -78,10 +150,62 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"symbol\": \"PETR4\",\n  \"target_price\": 40.50,\n  \"direction\": \"above\",\n  \"device_token\": \"device-token-example\"\n}"
+          "raw": "{\n  \"action_id\": \"action-petr4\",\n  \"target_price\": 40.50,\n  \"direction\": \"above\",\n  \"device_token\": \"device-token-example\"\n}"
         },
         "url": "{{baseUrl}}/alerts",
-        "description": "Cria um alerta de preço para um ativo da B3."
+        "description": "Cria um alerta de preço para uma ação da B3 usando action_id e adiciona a ação à watchlist se necessário."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "if (body.id) {",
+              "  pm.environment.set('alertId', body.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Update Alert",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"target_price\": 43.50,\n  \"direction\": \"above\"\n}"
+        },
+        "url": "{{baseUrl}}/alerts/{{alertId}}",
+        "description": "Atualiza o preço alvo e a direção de um alerta."
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Alert",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/alerts/{{alertId}}",
+        "description": "Exclui fisicamente um alerta."
       },
       "response": []
     },

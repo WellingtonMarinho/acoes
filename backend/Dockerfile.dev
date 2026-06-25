@@ -1,0 +1,10 @@
+FROM golang:1.25.7-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache ca-certificates git && \
+	go install github.com/air-verse/air@v1.63.0
+
+EXPOSE 8080
+
+CMD ["sh", "-c", "go run ./cmd/migrate && air -c .air.toml"]

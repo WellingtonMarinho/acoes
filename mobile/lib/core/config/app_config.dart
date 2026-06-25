@@ -1,22 +1,22 @@
+import 'dart:io';
+
 class AppConfig {
   const AppConfig({
     required this.apiBaseUrl,
-    required this.useDemoData,
   });
 
   final String apiBaseUrl;
-  final bool useDemoData;
 
   factory AppConfig.fromEnvironment() {
-    return const AppConfig(
+    return AppConfig(
       apiBaseUrl: String.fromEnvironment(
         'API_BASE_URL',
-        defaultValue: 'http://localhost:8080',
-      ),
-      useDemoData: bool.fromEnvironment(
-        'USE_DEMO_DATA',
-        defaultValue: false,
+        defaultValue: _platformDefaultApiBaseUrl(),
       ),
     );
   }
+}
+
+String _platformDefaultApiBaseUrl() {
+  return Platform.isAndroid ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
 }
