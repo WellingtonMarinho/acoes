@@ -5,7 +5,8 @@ import 'config/app_config.dart';
 import 'network/api_client.dart';
 import 'storage/session_store.dart';
 
-final appConfigProvider = Provider<AppConfig>((ref) => AppConfig.fromEnvironment());
+final appConfigProvider =
+    Provider<AppConfig>((ref) => AppConfig.fromEnvironment());
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   final config = ref.watch(appConfigProvider);

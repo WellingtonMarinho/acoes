@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
-	"time"
 	"strings"
+	"time"
 
+	"ideacoes/backend/internal/actions"
 	"ideacoes/backend/internal/alerts"
 	"ideacoes/backend/internal/devices"
 	"ideacoes/backend/internal/httpapi"
@@ -16,6 +17,7 @@ import (
 	backendpostgres "ideacoes/backend/internal/postgres"
 	"ideacoes/backend/internal/pricefeed"
 	"ideacoes/backend/internal/store"
+	"ideacoes/backend/internal/watchlist"
 )
 
 type App struct {
@@ -38,6 +40,11 @@ func New(cfg Config, logger *log.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	actionRepo, err := actionRepositoryFromConfig(cfg, db, logger)
+	if err != nil {
+		return nil, err
+	}
+	actionService := actions.NewService(actionRepo)
 	deviceRepo, err := deviceRepositoryFromConfig(cfg, db, logger)
 	if err != nil {
 		return nil, err
@@ -48,10 +55,15 @@ func New(cfg Config, logger *log.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	watchlistRepo, err := watchlistRepositoryFromConfig(cfg, db, logger)
+	if err != nil {
+		return nil, err
+	}
+	watchlistService := watchlist.NewService(watchlistRepo, actionService, alertRepo, feed)
 	notifier := alerts.NewLogNotifier(logger)
-	alertService := alerts.NewServiceWithSymbolRegistrar(alertRepo, notifier, deviceService, feed)
+	alertService := alerts.NewServiceWithActionResolver(alertRepo, notifier, deviceService, feed, watchlistService, actionService)
 
-	server := httpapi.NewServer(alertService, deviceService, feed, logger, cfg.JWTSecret)
+	server := httpapi.NewServer(alertService, actionService, watchlistService, deviceService, feed, logger, "")
 	worker := monitor.NewWorker(alertService, feed, logger, cfg.MonitorInterval)
 
 	httpServer := &http.Server{
@@ -88,10 +100,6 @@ func databaseFromConfig(cfg Config, logger *log.Logger) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := backendpostgres.Migrate(context.Background(), db); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
 	return db, nil
 }
 
@@ -121,6 +129,26 @@ func deviceRepositoryFromConfig(cfg Config, db *sql.DB, logger *log.Logger) (dev
 
 	logger.Printf("using in-memory device store")
 	return devices.NewMemoryRepository(), nil
+}
+
+func actionRepositoryFromConfig(cfg Config, db *sql.DB, logger *log.Logger) (actions.Repository, error) {
+	if db != nil {
+		logger.Printf("using postgres action store")
+		return backendpostgres.NewActionRepository(db), nil
+	}
+
+	logger.Printf("using in-memory action store")
+	return memory.NewActionRepository(), nil
+}
+
+func watchlistRepositoryFromConfig(cfg Config, db *sql.DB, logger *log.Logger) (watchlist.Repository, error) {
+	if db != nil {
+		logger.Printf("using postgres watchlist store")
+		return backendpostgres.NewWatchlistRepository(db), nil
+	}
+
+	logger.Printf("using in-memory watchlist store")
+	return memory.NewWatchlistRepository(), nil
 }
 
 func priceFeedFromConfig(cfg Config, logger *log.Logger) (pricefeed.Feed, error) {

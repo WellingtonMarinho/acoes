@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -43,7 +44,7 @@ func (r *DeviceRepository) Resolve(ctx context.Context, userID string) (devices.
 	row := r.db.QueryRowContext(ctx, `select user_id, device_token, platform, created_at from device_registrations where user_id=$1`, strings.TrimSpace(userID))
 	var registration devices.Registration
 	if err := row.Scan(&registration.UserID, &registration.DeviceToken, &registration.Platform, &registration.CreatedAt); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return devices.Registration{}, false, nil
 		}
 		return devices.Registration{}, false, err

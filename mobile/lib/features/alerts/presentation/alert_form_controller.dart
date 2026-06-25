@@ -1,25 +1,26 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../actions/domain/action.dart';
 import '../domain/alert.dart';
 
 class AlertDraft {
   const AlertDraft({
-    this.symbol = '',
+    this.action,
     this.targetPrice = '',
     this.direction = AlertDirection.above,
   });
 
-  final String symbol;
+  final MarketAction? action;
   final String targetPrice;
   final AlertDirection direction;
 
   AlertDraft copyWith({
-    String? symbol,
+    MarketAction? action,
     String? targetPrice,
     AlertDirection? direction,
   }) {
     return AlertDraft(
-      symbol: symbol ?? this.symbol,
+      action: action ?? this.action,
       targetPrice: targetPrice ?? this.targetPrice,
       direction: direction ?? this.direction,
     );
@@ -33,8 +34,8 @@ class AlertFormController extends Notifier<AlertDraft> {
   @override
   AlertDraft build() => const AlertDraft();
 
-  void setSymbol(String value) {
-    state = state.copyWith(symbol: value);
+  void setAction(MarketAction value) {
+    state = state.copyWith(action: value);
   }
 
   void setTargetPrice(String value) {

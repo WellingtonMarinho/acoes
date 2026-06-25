@@ -15,8 +15,6 @@ import (
 	"ideacoes/backend/internal/alerts"
 )
 
-var errAlertNotFound = errors.New("alert not found")
-
 type FileAlertRepository struct {
 	mu     sync.RWMutex
 	path   string
@@ -92,6 +90,67 @@ func (r *FileAlertRepository) ListOpenBySymbol(ctx context.Context, symbol strin
 	return out, nil
 }
 
+func (r *FileAlertRepository) Get(ctx context.Context, id string) (alerts.Alert, error) {
+	_ = ctx
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	alert, ok := r.alerts[id]
+	if !ok {
+		return alerts.Alert{}, alerts.ErrAlertNotFound
+	}
+	return alert, nil
+}
+
+func (r *FileAlertRepository) Update(ctx context.Context, alert alerts.Alert) (alerts.Alert, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.alerts[alert.ID]; !ok {
+		return alerts.Alert{}, alerts.ErrAlertNotFound
+	}
+	r.alerts[alert.ID] = alert
+	if err := r.persistLocked(); err != nil {
+		return alerts.Alert{}, err
+	}
+	return alert, nil
+}
+
+func (r *FileAlertRepository) Delete(ctx context.Context, id string) error {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.alerts[id]; !ok {
+		return alerts.ErrAlertNotFound
+	}
+	delete(r.alerts, id)
+	return r.persistLocked()
+}
+
+func (r *FileAlertRepository) DeleteByUserAndAction(ctx context.Context, userID, actionID string) (int64, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	userID = strings.TrimSpace(userID)
+	actionID = strings.TrimSpace(actionID)
+	var deleted int64
+	for id, alert := range r.alerts {
+		if alert.UserID == userID && alert.ActionID == actionID {
+			delete(r.alerts, id)
+			deleted++
+		}
+	}
+	if deleted > 0 {
+		if err := r.persistLocked(); err != nil {
+			return 0, err
+		}
+	}
+	return deleted, nil
+}
+
 func (r *FileAlertRepository) MarkTriggered(ctx context.Context, id string, triggeredAt time.Time) (alerts.Alert, error) {
 	_ = ctx
 	r.mu.Lock()
@@ -99,11 +158,15 @@ func (r *FileAlertRepository) MarkTriggered(ctx context.Context, id string, trig
 
 	alert, ok := r.alerts[id]
 	if !ok {
-		return alerts.Alert{}, errAlertNotFound
+		return alerts.Alert{}, alerts.ErrAlertNotFound
+	}
+	if alert.Status != alerts.AlertStatusOpen {
+		return alerts.Alert{}, alerts.ErrAlertNotEditable
 	}
 
 	alert.Status = alerts.AlertStatusTriggered
 	alert.TriggeredAt = &triggeredAt
+	alert.UpdatedAt = triggeredAt
 	r.alerts[id] = alert
 	if err := r.persistLocked(); err != nil {
 		return alerts.Alert{}, err

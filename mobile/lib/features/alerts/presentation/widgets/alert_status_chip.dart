@@ -14,8 +14,8 @@ class AlertStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final label = switch (status) {
-      AlertStatus.open => 'open',
-      AlertStatus.triggered => 'triggered',
+      AlertStatus.open => 'ativo',
+      AlertStatus.triggered => 'disparado',
     };
     final background = switch (status) {
       AlertStatus.open => colors.secondaryContainer,

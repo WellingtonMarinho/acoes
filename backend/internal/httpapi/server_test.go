@@ -13,11 +13,12 @@ import (
 	"testing"
 	"time"
 
+	"ideacoes/backend/internal/actions"
 	"ideacoes/backend/internal/alerts"
-	"ideacoes/backend/internal/auth"
 	"ideacoes/backend/internal/devices"
 	"ideacoes/backend/internal/memory"
 	"ideacoes/backend/internal/pricefeed"
+	"ideacoes/backend/internal/watchlist"
 )
 
 type alertRepo struct {
@@ -57,6 +58,61 @@ func (r *alertRepo) ListOpenBySymbol(ctx context.Context, symbol string) ([]aler
 	_ = ctx
 	_ = symbol
 	return nil, nil
+}
+
+func (r *alertRepo) Get(ctx context.Context, id string) (alerts.Alert, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, item := range r.alerts {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return alerts.Alert{}, alerts.ErrAlertNotFound
+}
+
+func (r *alertRepo) Update(ctx context.Context, alert alerts.Alert) (alerts.Alert, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, item := range r.alerts {
+		if item.ID == alert.ID {
+			r.alerts[i] = alert
+			return alert, nil
+		}
+	}
+	return alerts.Alert{}, alerts.ErrAlertNotFound
+}
+
+func (r *alertRepo) Delete(ctx context.Context, id string) error {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, item := range r.alerts {
+		if item.ID == id {
+			r.alerts = append(r.alerts[:i], r.alerts[i+1:]...)
+			return nil
+		}
+	}
+	return alerts.ErrAlertNotFound
+}
+
+func (r *alertRepo) DeleteByUserAndAction(ctx context.Context, userID, actionID string) (int64, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var deleted int64
+	var remaining []alerts.Alert
+	for _, item := range r.alerts {
+		if item.UserID == userID && item.ActionID == actionID {
+			deleted++
+			continue
+		}
+		remaining = append(remaining, item)
+	}
+	r.alerts = remaining
+	return deleted, nil
 }
 
 func (r *alertRepo) MarkTriggered(ctx context.Context, id string, triggeredAt time.Time) (alerts.Alert, error) {
@@ -105,6 +161,52 @@ func (r *deviceRepo) ListByUser(ctx context.Context, userID string) ([]devices.R
 	return out, nil
 }
 
+type watchlistRepo struct {
+	mu    sync.Mutex
+	items []watchlist.Item
+}
+
+func (r *watchlistRepo) Upsert(ctx context.Context, item watchlist.Item) (watchlist.Item, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, existing := range r.items {
+		if existing.UserID == item.UserID && existing.ActionID == item.ActionID {
+			item.CreatedAt = existing.CreatedAt
+			r.items[i] = item
+			return item, nil
+		}
+	}
+	r.items = append(r.items, item)
+	return item, nil
+}
+
+func (r *watchlistRepo) ListByUser(ctx context.Context, userID string) ([]watchlist.Item, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []watchlist.Item
+	for _, item := range r.items {
+		if item.UserID == userID {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+
+func (r *watchlistRepo) Delete(ctx context.Context, userID, actionID string) error {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, item := range r.items {
+		if item.UserID == userID && item.ActionID == actionID {
+			r.items = append(r.items[:i], r.items[i+1:]...)
+			return nil
+		}
+	}
+	return watchlist.ErrWatchlistItemNotFound
+}
+
 type noopNotifier struct{}
 
 func (noopNotifier) Notify(ctx context.Context, alert alerts.Alert, marketPrice float64) error {
@@ -126,37 +228,35 @@ func (r deviceTokenResolver) Resolve(ctx context.Context, userID string) (string
 	return registration.DeviceToken, true, nil
 }
 
-func TestCreateAlertRequiresJWT(t *testing.T) {
-	t.Setenv("JWT_SECRET", "secret")
-	alertService := alerts.NewService(&alertRepo{}, noopNotifier{}, nil)
+func TestCreateAlertIsPublic(t *testing.T) {
+	actionService := actions.NewService(memory.NewActionRepository())
+	alertRepo := &alertRepo{}
+	watchlistService := watchlist.NewService(&watchlistRepo{}, actionService, alertRepo, pricefeed.NewMemoryFeed())
+	alertService := alerts.NewServiceWithActionResolver(alertRepo, noopNotifier{}, nil, nil, watchlistService, actionService)
 	deviceService := devices.NewService(&deviceRepo{})
-	server := NewServer(alertService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "secret")
+	server := NewServer(alertService, actionService, watchlistService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "")
 
-	req := httptest.NewRequest(http.MethodPost, "/alerts", strings.NewReader(`{"symbol":"PETR4","target_price":40.5,"direction":"above"}`))
+	req := httptest.NewRequest(http.MethodPost, "/alerts", strings.NewReader(`{"action_id":"action-petr4","target_price":40.5,"direction":"above"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
 	server.Routes().ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", rec.Code)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", rec.Code)
 	}
 }
 
-func TestCreateAlertUsesAuthenticatedUser(t *testing.T) {
-	t.Setenv("JWT_SECRET", "secret")
+func TestCreateAlertUsesDefaultUserlessFlow(t *testing.T) {
 	alertRepo := &alertRepo{}
-	alertService := alerts.NewService(alertRepo, noopNotifier{}, nil)
+	actionService := actions.NewService(memory.NewActionRepository())
+	watchlistRepo := &watchlistRepo{}
+	watchlistService := watchlist.NewService(watchlistRepo, actionService, alertRepo, pricefeed.NewMemoryFeed())
+	alertService := alerts.NewServiceWithActionResolver(alertRepo, noopNotifier{}, nil, nil, watchlistService, actionService)
 	deviceService := devices.NewService(&deviceRepo{})
-	server := NewServer(alertService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "secret")
+	server := NewServer(alertService, actionService, watchlistService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "")
 
-	token, err := auth.Sign("user-123", "secret", time.Hour, time.Now())
-	if err != nil {
-		t.Fatalf("Sign() error = %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/alerts", strings.NewReader(`{"symbol":"PETR4","target_price":40.5,"direction":"above"}`))
-	req.Header.Set("Authorization", "Bearer "+token)
+	req := httptest.NewRequest(http.MethodPost, "/alerts", strings.NewReader(`{"action_id":"action-petr4","target_price":40.5,"direction":"above"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -171,54 +271,27 @@ func TestCreateAlertUsesAuthenticatedUser(t *testing.T) {
 	if len(alertRepo.alerts) != 1 {
 		t.Fatalf("expected 1 alert stored, got %d", len(alertRepo.alerts))
 	}
-	if alertRepo.alerts[0].UserID != "user-123" {
-		t.Fatalf("expected user-123, got %q", alertRepo.alerts[0].UserID)
+	if alertRepo.alerts[0].UserID != "user-001" {
+		t.Fatalf("expected user-001, got %q", alertRepo.alerts[0].UserID)
+	}
+	if alertRepo.alerts[0].ActionID != "action-petr4" {
+		t.Fatalf("expected action-petr4, got %q", alertRepo.alerts[0].ActionID)
 	}
 }
 
-func TestIssueToken(t *testing.T) {
-	t.Setenv("JWT_SECRET", "secret")
-	alertService := alerts.NewService(&alertRepo{}, noopNotifier{}, nil)
-	deviceService := devices.NewService(&deviceRepo{})
-	server := NewServer(alertService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "secret")
-
-	req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(`{"user_id":"user-123"}`))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	server.Routes().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-
-	var payload map[string]string
-	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if payload["access_token"] == "" {
-		t.Fatal("expected access_token in response")
-	}
-}
-
-func TestListAlertsRequiresJWTAndFiltersByUser(t *testing.T) {
-	t.Setenv("JWT_SECRET", "secret")
+func TestListAlertsReturnsItems(t *testing.T) {
 	alertRepo := &alertRepo{}
 	alertRepo.alerts = []alerts.Alert{
-		{ID: "1", UserID: "user-123", Symbol: "PETR4"},
+		{ID: "1", UserID: "user-001", Symbol: "PETR4"},
 		{ID: "2", UserID: "user-999", Symbol: "VALE3"},
 	}
-	alertService := alerts.NewService(alertRepo, noopNotifier{}, nil)
+	actionService := actions.NewService(memory.NewActionRepository())
+	watchlistService := watchlist.NewService(&watchlistRepo{}, actionService, alertRepo, pricefeed.NewMemoryFeed())
+	alertService := alerts.NewServiceWithActionResolver(alertRepo, noopNotifier{}, nil, nil, watchlistService, actionService)
 	deviceService := devices.NewService(&deviceRepo{})
-	server := NewServer(alertService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "secret")
-
-	token, err := auth.Sign("user-123", "secret", time.Hour, time.Now())
-	if err != nil {
-		t.Fatalf("Sign() error = %v", err)
-	}
+	server := NewServer(alertService, actionService, watchlistService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "")
 
 	req := httptest.NewRequest(http.MethodGet, "/alerts", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 
 	server.Routes().ServeHTTP(rec, req)
@@ -231,30 +304,26 @@ func TestListAlertsRequiresJWTAndFiltersByUser(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&items); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(items) != 1 || items[0].UserID != "user-123" {
-		t.Fatalf("expected only alerts for user-123, got %#v", items)
+	if len(items) != 1 || items[0].UserID != "user-001" {
+		t.Fatalf("expected only alerts for user-001, got %#v", items)
 	}
 }
 
 func TestEndToEndMVPFlow(t *testing.T) {
 	alertRepo := memory.NewAlertRepository()
 	deviceRepo := devices.NewMemoryRepository()
-	alertService := alerts.NewService(alertRepo, noopNotifier{}, deviceTokenResolver{repo: deviceRepo})
+	actionService := actions.NewService(memory.NewActionRepository())
+	watchlistService := watchlist.NewService(memory.NewWatchlistRepository(), actionService, alertRepo, pricefeed.NewMemoryFeed())
+	alertService := alerts.NewServiceWithActionResolver(alertRepo, noopNotifier{}, deviceTokenResolver{repo: deviceRepo}, nil, watchlistService, actionService)
 	deviceService := devices.NewService(deviceRepo)
 	feed := pricefeed.NewMemoryFeed()
-	server := NewServer(alertService, deviceService, feed, log.New(os.Stdout, "", 0), "secret")
+	server := NewServer(alertService, actionService, watchlistService, deviceService, feed, log.New(os.Stdout, "", 0), "")
 
-	ts := httptest.NewServer(server.Routes())
-	defer ts.Close()
+	registerDeviceDirect(t, server.Routes(), "device-123", "android")
+	createAlertDirect(t, server.Routes(), "action-petr4", 40.5, "above")
+	upsertPriceDirect(t, server.Routes(), "PETR4", 41)
 
-	client := ts.Client()
-
-	token := mustIssueToken(t, client, ts.URL, "user-123")
-	mustRegisterDevice(t, client, ts.URL, token, "device-123", "android")
-	mustCreateAlert(t, client, ts.URL, token, "PETR4", 40.5, "above")
-	mustUpsertPrice(t, client, ts.URL, "PETR4", 41)
-
-	req, err := http.NewRequest(http.MethodPost, ts.URL+"/prices/check", strings.NewReader(`{"prices":[{"symbol":"PETR4","price":41}]}`))
+	req, err := http.NewRequest(http.MethodPost, "/prices/check", strings.NewReader(`{"prices":[{"symbol":"PETR4","price":41}]}`))
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
@@ -276,37 +345,123 @@ func TestEndToEndMVPFlow(t *testing.T) {
 	}
 }
 
-func mustIssueToken(t *testing.T, client *http.Client, baseURL, userID string) string {
-	t.Helper()
+func TestActionsSearchAndWatchlistFlow(t *testing.T) {
+	alertRepo := memory.NewAlertRepository()
+	actionService := actions.NewService(memory.NewActionRepository())
+	watchlistService := watchlist.NewService(memory.NewWatchlistRepository(), actionService, alertRepo, pricefeed.NewMemoryFeed())
+	alertService := alerts.NewServiceWithActionResolver(alertRepo, noopNotifier{}, nil, nil, watchlistService, actionService)
+	deviceService := devices.NewService(&deviceRepo{})
+	server := NewServer(alertService, actionService, watchlistService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "")
 
-	reqBody := strings.NewReader(`{"user_id":"` + userID + `"}`)
-	req, err := http.NewRequest(http.MethodPost, baseURL+"/auth/token", reqBody)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
+	req := httptest.NewRequest(http.MethodGet, "/actions?query=Petrobras%20PN", nil)
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	res, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("issue token: %v", err)
+	var actionsPayload map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&actionsPayload); err != nil {
+		t.Fatalf("decode actions response: %v", err)
 	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", res.StatusCode)
+	items, ok := actionsPayload["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected one action, got %#v", actionsPayload["items"])
 	}
 
-	var payload map[string]string
-	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
-		t.Fatalf("decode token: %v", err)
+	addReq := httptest.NewRequest(http.MethodPost, "/watchlist", strings.NewReader(`{"action_id":"action-petr4"}`))
+	addReq.Header.Set("Content-Type", "application/json")
+	addRec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(addRec, addReq)
+	if addRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", addRec.Code)
 	}
-	if payload["access_token"] == "" {
-		t.Fatal("expected access token")
+
+	listReq := httptest.NewRequest(http.MethodGet, "/watchlist", nil)
+	listRec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", listRec.Code)
 	}
-	return payload["access_token"]
+	var watchlistPayload map[string]any
+	if err := json.NewDecoder(listRec.Body).Decode(&watchlistPayload); err != nil {
+		t.Fatalf("decode watchlist response: %v", err)
+	}
+	watchlistItems, ok := watchlistPayload["items"].([]any)
+	if !ok || len(watchlistItems) != 1 {
+		t.Fatalf("expected one watchlist item, got %#v", watchlistPayload["items"])
+	}
 }
 
-func mustRegisterDevice(t *testing.T, client *http.Client, baseURL, token, deviceToken, platform string) {
+func TestCreateActionAndAddToWatchlist(t *testing.T) {
+	actionService := actions.NewService(memory.NewActionRepository())
+	alertRepo := memory.NewAlertRepository()
+	watchlistService := watchlist.NewService(memory.NewWatchlistRepository(), actionService, alertRepo, pricefeed.NewMemoryFeed())
+	alertService := alerts.NewServiceWithActionResolver(alertRepo, noopNotifier{}, nil, nil, watchlistService, actionService)
+	deviceService := devices.NewService(&deviceRepo{})
+	server := NewServer(alertService, actionService, watchlistService, deviceService, pricefeed.NewMemoryFeed(), log.New(os.Stdout, "", 0), "")
+
+	req := httptest.NewRequest(http.MethodPost, "/actions", strings.NewReader(`{"symbol":"ABCD3","name":"Acao Teste","exchange":"B3"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", rec.Code)
+	}
+
+	var created actions.Action
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode created action: %v", err)
+	}
+	if created.ID == "" || created.Symbol != "ABCD3" {
+		t.Fatalf("unexpected action payload: %#v", created)
+	}
+
+	addReq := httptest.NewRequest(http.MethodPost, "/watchlist", strings.NewReader(`{"action_id":"`+created.ID+`"}`))
+	addReq.Header.Set("Content-Type", "application/json")
+	addRec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(addRec, addReq)
+	if addRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 when adding new action, got %d", addRec.Code)
+	}
+}
+
+func registerDeviceDirect(t *testing.T, handler http.Handler, deviceToken, platform string) {
+	t.Helper()
+	body := strings.NewReader(`{"device_token":"` + deviceToken + `","platform":"` + platform + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/devices/register", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", rec.Code)
+	}
+}
+
+func createAlertDirect(t *testing.T, handler http.Handler, actionID string, targetPrice float64, direction string) {
+	t.Helper()
+	body := strings.NewReader(`{"action_id":"` + actionID + `","target_price":` + strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", targetPrice), "0"), ".") + `,"direction":"` + direction + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/alerts", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", rec.Code)
+	}
+}
+
+func upsertPriceDirect(t *testing.T, handler http.Handler, symbol string, price float64) {
+	t.Helper()
+	body := strings.NewReader(`{"symbol":"` + symbol + `","price":` + strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", price), "0"), ".") + `}`)
+	req := httptest.NewRequest(http.MethodPut, "/prices", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func mustRegisterDevice(t *testing.T, client *http.Client, baseURL, deviceToken, platform string) {
 	t.Helper()
 
 	body := strings.NewReader(`{"device_token":"` + deviceToken + `","platform":"` + platform + `"}`)
@@ -315,7 +470,6 @@ func mustRegisterDevice(t *testing.T, client *http.Client, baseURL, token, devic
 		t.Fatalf("new request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -328,16 +482,15 @@ func mustRegisterDevice(t *testing.T, client *http.Client, baseURL, token, devic
 	}
 }
 
-func mustCreateAlert(t *testing.T, client *http.Client, baseURL, token, symbol string, targetPrice float64, direction string) {
+func mustCreateAlert(t *testing.T, client *http.Client, baseURL, actionID string, targetPrice float64, direction string) {
 	t.Helper()
 
-	body := strings.NewReader(`{"symbol":"` + symbol + `","target_price":` + strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", targetPrice), "0"), ".") + `,"direction":"` + direction + `"}`)
+	body := strings.NewReader(`{"action_id":"` + actionID + `","target_price":` + strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", targetPrice), "0"), ".") + `,"direction":"` + direction + `"}`)
 	req, err := http.NewRequest(http.MethodPost, baseURL+"/alerts", body)
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
 
 	res, err := client.Do(req)
 	if err != nil {

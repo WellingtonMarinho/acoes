@@ -14,7 +14,10 @@ class SessionStore {
     final userId = _prefs.getString(_userIdKey);
     final accessToken = _prefs.getString(_accessTokenKey);
 
-    if (userId == null || accessToken == null || userId.isEmpty || accessToken.isEmpty) {
+    if (userId == null ||
+        accessToken == null ||
+        userId.isEmpty ||
+        accessToken.isEmpty) {
       return null;
     }
 

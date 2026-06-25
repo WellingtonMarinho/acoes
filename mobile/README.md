@@ -2,8 +2,9 @@
 
 App Flutter para:
 
-- criar alertas
-- listar watchlist
+- monitorar ações
+- criar, editar e excluir alertas
+- alternar entre tema claro e escuro
 - configurar tokens de push
 
 ## Status
@@ -12,13 +13,17 @@ O projeto Flutter mínimo já está estruturado neste diretório.
 
 O app já tem:
 
-- home
+- shell com abas para monitoradas, alertas e ajustes
+- watchlist por usuário
+- criação de alerta a partir de uma ação monitorada
+- edição e exclusão de alertas
+- histórico de alertas disparados visível na tela de alertas
+- tema claro/escuro com preferência local
 - sessão provisória com token
-- criação de alerta
 - registro de device
 - persistência local da sessão
 
-Parte da navegação ainda usa dados demo enquanto a integração total com o backend é fechada.
+Os dados dinâmicos do app vêm do backend protegido.
 
 ## Como subir no Android Studio
 
@@ -79,6 +84,9 @@ make run-mobile
 
 Se o emulador estiver ativo, o Flutter deve detectar o device Android e subir o app.
 
+Se o backend estiver rodando na sua máquina local, o app Android usa `http://10.0.2.2:8080` por padrão para alcançar o host.
+Se precisar apontar para outro backend, exporte `API_BASE_URL` antes de rodar o app.
+
 ### 6. Rodar testes
 
 Para executar a suíte do app:
@@ -101,6 +109,5 @@ Nesse caso, volte ao `Device Manager`, inicie um emulador e tente novamente.
 
 ## Próximos passos
 
-1. Consolidar a integração do client HTTP com o backend protegido.
-2. Melhorar o pós-submit das telas principais.
-3. Cobrir os fluxos com testes de widget e de repositório.
+1. Melhorar detalhes finos de densidade visual e feedbacks.
+2. Cobrir mais fluxos com testes de widget e de repositório.

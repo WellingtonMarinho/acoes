@@ -1,9 +1,21 @@
 FLUTTER := /Users/wellingtonsoares/development/flutter/bin/flutter
 ANDROID_DEVICE ?= emulator-5554
 
-.PHONY: run-backend test-backend test-backend-integration run-mobile test-mobile
+.PHONY: run-backend dev-backend build-backend build-dev-backend rebuild-backend test-backend test-backend-integration run-mobile test-mobile
 
 run-backend:
+	docker compose up --build
+
+dev-backend:
+	docker compose --profile dev up backend-dev
+
+build-backend:
+	docker compose build backend migrate
+
+build-dev-backend:
+	docker compose build backend-dev
+
+rebuild-backend:
 	docker compose up --build
 
 test-backend:

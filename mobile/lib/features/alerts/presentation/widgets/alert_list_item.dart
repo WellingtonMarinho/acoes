@@ -21,7 +21,7 @@ class AlertListItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
@@ -32,13 +32,15 @@ class AlertListItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  alert.symbol,
+                  alert.actionName.isEmpty ? alert.symbol : alert.actionName,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                 ),
                 const SizedBox(height: 4),
-                Text('R\$ ${alert.targetPrice.toStringAsFixed(2)} · $directionLabel'),
+                Text(
+                  '${alert.symbol} · R\$ ${alert.targetPrice.toStringAsFixed(2)} · $directionLabel',
+                ),
               ],
             ),
           ),

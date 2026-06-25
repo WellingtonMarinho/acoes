@@ -52,10 +52,7 @@ func (f *MemoryFeed) RegisterSymbol(ctx context.Context, symbol string) error {
 		return nil
 	}
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if _, ok := f.snapshots[symbol]; !ok {
-		f.snapshots[symbol] = alerts.PriceSnapshot{Symbol: symbol}
-	}
+	// The memory feed only exposes observed prices. Registering a symbol must not
+	// create a zero-price snapshot, otherwise "below" alerts can fire immediately.
 	return nil
 }

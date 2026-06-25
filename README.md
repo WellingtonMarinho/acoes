@@ -20,6 +20,7 @@ O backend inicial já expõe:
 
 - `GET /healthz`
 - `POST /auth/token`
+- `GET /actions`
 - `POST /alerts`
 - `GET /alerts`
 - `GET /devices`
@@ -28,53 +29,49 @@ O backend inicial já expõe:
 - `PUT /prices`
 - `POST /prices/check`
 
-Por padrão ele usa armazenamento em memória. Para persistir os alertas, defina:
-
-```bash
-ALERTS_STORE_PATH=./data/alerts.json
-```
-
-Para persistir os devices, defina:
-
-```bash
-DEVICES_STORE_PATH=./data/devices.json
-```
-
 O worker de monitoramento usa `MONITOR_INTERVAL_SECONDS` e, por padrão, roda a cada 10 segundos.
 O feed de preços também é configurável: por padrão usa memória, mas você pode apontar para Twelve Data com `PRICEFEED_PROVIDER=twelvedata` e `TWELVEDATA_API_KEY`.
 Se `DATABASE_URL` estiver definido, o backend usa o Postgres do `docker compose` para alertas e devices.
+Se `DATABASE_URL` não estiver definido, o backend continua com os repositórios em memória/arquivo do ambiente local.
 
 Fluxo sugerido para teste:
 
 1. Emita um token em `POST /auth/token`.
 2. Registre o device token em `POST /devices/register`.
-3. Crie um alerta em `POST /alerts`.
-4. Atualize um preço em `PUT /prices`.
-5. Aguarde o worker ou force a checagem com `POST /prices/check`.
+3. Liste as ações em `GET /actions`.
+4. Crie um alerta em `POST /alerts` usando `action_id`.
+5. Atualize um preço em `PUT /prices`.
+6. Aguarde o worker ou force a checagem com `POST /prices/check`.
 
 > `GET /alerts`, `GET /devices`, `POST /alerts` e `POST /devices/register` exigem `Authorization: Bearer <token>`.
 
 ### Subida com Docker
 
-Para subir backend e Postgres com Docker Compose:
+Para subir backend, migrations e Postgres com Docker Compose:
 
 ```bash
 docker compose up --build
 ```
 
 O backend ficará em `http://localhost:8080` e o Postgres em `localhost:5432`.
-Por enquanto o backend ainda usa armazenamento em memória/arquivo; o Postgres já está pronto na infraestrutura para a próxima etapa.
+Nesse caminho, o container de migrations roda antes da API e o backend sobe já com o schema aplicado.
+As migrations seguem o padrão do `goose` e ficam em `backend/internal/postgres/migrations/`.
 
 ## Mobile
 
-O app Flutter já está sendo estruturado com:
+O app Flutter já está estruturado com:
 
-- home
-- tela de criação de alerta
+- shell com abas para monitoradas, alertas e ajustes
+- watchlist por usuário
+- criação, edição e exclusão de alertas
+- histórico visível de alertas disparados
 - tela de registro de device
+- alternância entre tema claro e escuro
 - sessão provisória com persistência local
 
-O próximo passo é consolidar a integração do mobile com o backend protegido.
+Os dados dinâmicos do app vêm do backend protegido.
+
+O próximo passo é refinar os detalhes de UX e ampliar os fluxos cobertos por testes automatizados.
 
 ### Comandos úteis
 

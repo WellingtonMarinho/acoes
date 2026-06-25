@@ -12,25 +12,58 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ideacoes-migrate
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://ideacoes:ideacoes@postgres:5432/ideacoes?sslmode=disable
+      GOOSE_DIR: /app/migrations
+      JWT_SECRET: dev-secret
+    entrypoint: ["/app/migrate"]
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ideacoes-backend
     depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      HTTP_ADDR: :8080
+      JWT_SECRET: dev-secret
+      DATABASE_URL: postgres://ideacoes:ideacoes@postgres:5432/ideacoes?sslmode=disable
+      MONITOR_INTERVAL_SECONDS: 10
+    ports:
+      - "8080:8080"
+
+  backend-dev:
+    profiles:
+      - dev
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: ideacoes-backend-dev
+    depends_on:
       - postgres
     environment:
       HTTP_ADDR: :8080
       JWT_SECRET: dev-secret
       DATABASE_URL: postgres://ideacoes:ideacoes@postgres:5432/ideacoes?sslmode=disable
-      ALERTS_STORE_PATH: /data/alerts.json
-      DEVICES_STORE_PATH: /data/devices.json
+      GOOSE_DIR: /app/internal/postgres/migrations
       MONITOR_INTERVAL_SECONDS: 10
     ports:
       - "8080:8080"
     volumes:
-      - backend_data:/data
+      - ./backend:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
 
 volumes:
   postgres_data:
-  backend_data:
+  go_mod_cache:
+  go_build_cache:
